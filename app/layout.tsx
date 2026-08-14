@@ -1,29 +1,33 @@
+// app/layout.tsx
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Inter, Geist } from "next/font/google";
 import "./globals.css";
+import { cn } from "@/lib/utils";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
+const geist = Geist({subsets:['latin'],variable:'--font-sans'});
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
+const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Vendor E- Commerce",
-  description: "A vendor e-commerce platform built with Next.js, TypeScript, and Tailwind CSS.",
+  title: "VendorStore - E-Commerce",
+  description: "A modern MVP e-commerce platform",
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
   return (
-    <html
-      lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
-    >
-      <body className="min-h-full flex flex-col">{children}</body>
+    <html lang="en" className={cn("font-sans", geist.variable)}>
+      <body
+        cz-shortcut-listen="true"
+        className={`${inter.className} bg-gray-50 text-gray-900 antialiased min-h-screen flex flex-col`}
+      >
+        
+        <main className="flex-1">{children}</main>
+    
+      </body>
     </html>
   );
 }
