@@ -87,7 +87,8 @@ export default function LoginPage() {
     const message =
       err?.response?.data?.message ||
       err?.response?.data?.error ||
-      err?.response?.data?.errors?.[0]?.message;
+      err?.response?.data?.errors?.[0]?.message ||
+      err?.response?.data?.data?.message;
 
     if (message) return message;
 
@@ -146,20 +147,35 @@ export default function LoginPage() {
       console.log("LOGIN RESPONSE:", res.data);
 
       /* =====================================================
+          BACKEND RESPONSE STRUCTURE
+
+          {
+            success: true,
+            data: {
+              message: "Login successful",
+              token: "...",
+              user: {...}
+            }
+          }
+      ===================================================== */
+
+      const responseData = res.data?.data;
+
+      /* =====================================================
           GET TOKEN
       ===================================================== */
 
       const token =
         res.data?.token ||
         res.data?.accessToken ||
-        res.data?.data?.token ||
-        res.data?.data?.accessToken;
+        responseData?.token ||
+        responseData?.accessToken;
 
       /* =====================================================
           GET USER
       ===================================================== */
 
-      const userData = res.data?.user || res.data?.data?.user;
+      const userData = res.data?.user || responseData?.user;
 
       if (!token) {
         console.error("Token missing from login response:", res.data);
@@ -186,7 +202,6 @@ export default function LoginPage() {
       ===================================================== */
 
       setUser(userData);
-      
 
       /* =====================================================
           REMEMBER EMAIL
@@ -203,13 +218,39 @@ export default function LoginPage() {
       }
 
       /* =====================================================
+          DETECT USER ROLE
+
+          Backend:
+          role: "CUSTOMER"
+          role: "ADMIN"
+      ===================================================== */
+
+      const userRole = String(userData?.role || "").toUpperCase();
+
+      console.log("LOGGED IN USER:", userData);
+      console.log("USER ROLE:", userRole);
+
+      /* =====================================================
           SUCCESS
       ===================================================== */
 
       setSuccess(true);
 
+      /* =====================================================
+          ROLE BASED REDIRECT
+      ===================================================== */
+
       setTimeout(() => {
-        router.push("/");
+        if (userRole === "ADMIN") {
+          console.log("Admin detected → redirecting to /admin");
+
+          router.push("/admin");
+        } else {
+          console.log("Customer detected → redirecting to /profile");
+
+          router.push("/profile");
+        }
+
         router.refresh();
       }, 850);
     } catch (err: any) {
@@ -217,12 +258,13 @@ export default function LoginPage() {
 
       if (err?.message?.includes("authentication token")) {
         setError(err.message);
+      } else if (err?.message?.includes("user data")) {
+        setError(err.message);
       } else {
         setError(getErrorMessage(err));
       }
     } finally {
       setLoading(false);
-      window.location.href = "/profile";
     }
   };
 
@@ -264,8 +306,6 @@ export default function LoginPage() {
           }}
           className="relative hidden overflow-hidden bg-[#f85606] p-10 lg:flex lg:flex-col lg:justify-between"
         >
-          {/* Decorative shapes */}
-
           <motion.div
             initial={{
               scale: 0.7,
@@ -298,8 +338,6 @@ export default function LoginPage() {
             className="absolute -bottom-24 -left-20 h-72 w-72 rounded-full border-[50px] border-white/10"
           />
 
-          {/* Floating glow */}
-
           <motion.div
             animate={{
               y: [0, -10, 0],
@@ -312,8 +350,6 @@ export default function LoginPage() {
             }}
             className="absolute right-16 top-24 h-24 w-24 rounded-full bg-white/10 blur-2xl"
           />
-
-          {/* Brand */}
 
           <motion.div
             initial={{
@@ -348,8 +384,6 @@ export default function LoginPage() {
               </span>
             </Link>
           </motion.div>
-
-          {/* Content */}
 
           <motion.div
             initial={{
@@ -514,9 +548,7 @@ export default function LoginPage() {
             </p>
           </motion.div>
 
-          {/* ===================================================
-              ERROR
-          ==================================================== */}
+          {/* ERROR */}
 
           <AnimatePresence>
             {error && (
@@ -566,9 +598,7 @@ export default function LoginPage() {
             )}
           </AnimatePresence>
 
-          {/* ===================================================
-              SUCCESS
-          ==================================================== */}
+          {/* SUCCESS */}
 
           <AnimatePresence>
             {success && (
@@ -621,9 +651,7 @@ export default function LoginPage() {
             )}
           </AnimatePresence>
 
-          {/* ===================================================
-              FORM
-          ==================================================== */}
+          {/* FORM */}
 
           <form onSubmit={handleSubmit} className="mt-7 space-y-5" noValidate>
             {/* EMAIL */}
