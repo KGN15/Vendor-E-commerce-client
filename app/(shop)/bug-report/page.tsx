@@ -15,33 +15,91 @@ import {
   FileText,
   MessageSquare,
 } from "lucide-react";
+import { api } from "@/lib/axios";
+
+/* =========================================================
+   TYPES
+========================================================= */
+
+type BugCategory = "UI" | "FUNCTIONAL" | "PERFORMANCE" | "OTHER";
 
 type BugForm = {
   title: string;
-  category: string;
+  category: BugCategory;
   description: string;
   email: string;
 };
 
+/* =========================================================
+   INITIAL FORM
+========================================================= */
+
 const initialForm: BugForm = {
   title: "",
-  category: "Other",
+  category: "OTHER",
   description: "",
   email: "",
 };
 
+/* =========================================================
+   CATEGORY OPTIONS
+========================================================= */
+
+const categoryOptions: {
+  value: BugCategory;
+  label: string;
+  description: string;
+}[] = [
+  {
+    value: "UI",
+    label: "UI / Design",
+    description: "Layout, styling, buttons, visual problems",
+  },
+  {
+    value: "FUNCTIONAL",
+    label: "Functionality",
+    description: "Feature or functionality is not working",
+  },
+  {
+    value: "PERFORMANCE",
+    label: "Performance",
+    description: "Slow loading, lag, or performance issues",
+  },
+  {
+    value: "OTHER",
+    label: "Other",
+    description: "Any other issue",
+  },
+];
+
+/* =========================================================
+   PAGE
+========================================================= */
+
 export default function BugReportPage() {
   const [form, setForm] = useState<BugForm>(initialForm);
+
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState("");
 
-  const updateField = (field: keyof BugForm, value: string) => {
+  /* =======================================================
+     UPDATE FIELD
+  ======================================================= */
+
+  const updateField = <K extends keyof BugForm>(
+    field: K,
+    value: BugForm[K],
+  ) => {
     setForm((prev) => ({
       ...prev,
       [field]: value,
     }));
   };
+
+  /* =======================================================
+     SUBMIT BUG REPORT
+  ======================================================= */
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -52,8 +110,22 @@ export default function BugReportPage() {
     const description = form.description.trim();
     const email = form.email.trim();
 
+    /* -------------------------------------------------------
+       CLIENT VALIDATION
+    ------------------------------------------------------- */
+
     if (!title) {
       setError("Please enter a short title for the bug.");
+      return;
+    }
+
+    if (title.length < 3) {
+      setError("Bug title must be at least 3 characters.");
+      return;
+    }
+
+    if (title.length > 150) {
+      setError("Bug title cannot exceed 150 characters.");
       return;
     }
 
@@ -67,42 +139,130 @@ export default function BugReportPage() {
       return;
     }
 
+    if (description.length > 5000) {
+      setError("Bug description cannot exceed 5000 characters.");
+      return;
+    }
+
+    if (email) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+      if (!emailRegex.test(email)) {
+        setError("Please enter a valid email address.");
+        return;
+      }
+    }
+
+    /* -------------------------------------------------------
+       SUBMIT
+    ------------------------------------------------------- */
+
     setSubmitting(true);
 
     try {
       /*
-       * Backend API can be connected here later.
+       * IMPORTANT:
        *
-       * Example:
+       * Backend BugReport model accepts ONLY:
        *
-       * await api.post("/bug-reports", {
-       *   title,
-       *   category: form.category,
-       *   description,
-       *   email: email || undefined,
-       * });
+       * UI
+       * FUNCTIONAL
+       * PERFORMANCE
+       * OTHER
+       *
+       * So we send form.category directly.
        */
 
-      await new Promise((resolve) => setTimeout(resolve, 700));
+      const response = await api.post("/bug-reports", {
+        title,
+        description,
+        category: form.category,
+
+        /*
+         * Send the current page URL so admin knows
+         * where the bug was reported.
+         */
+        pageUrl:
+          typeof window !== "undefined" ? window.location.href : undefined,
+
+        /*
+         * Keep email only if the user provided it.
+         */
+        ...(email ? { email } : {}),
+      });
+
+      console.log("Bug report submitted:", response.data);
 
       setSubmitted(true);
       setForm(initialForm);
-    } catch (err) {
+    } catch (err: any) {
       console.error("Bug report submission failed:", err);
 
-      setError("We couldn't submit your report right now. Please try again.");
+      const status = err?.response?.status;
+      const message = err?.response?.data?.message;
+
+      if (status === 401) {
+        setError("Your session has expired. Please sign in again.");
+        return;
+      }
+
+      if (status === 403) {
+        setError("You do not have permission to submit a bug report.");
+        return;
+      }
+
+      if (status === 400) {
+        /*
+         * Backend validation error.
+         */
+        setError(
+          Array.isArray(message)
+            ? message.join(", ")
+            : message || "Please check the information and try again.",
+        );
+        return;
+      }
+
+      if (status >= 500) {
+        setError("Something went wrong on the server. Please try again later.");
+        return;
+      }
+
+      if (!err?.response) {
+        setError(
+          "Unable to connect to the server. Please check your internet connection.",
+        );
+        return;
+      }
+
+      setError(
+        message ||
+          "We couldn't submit your report right now. Please try again.",
+      );
     } finally {
       setSubmitting(false);
     }
   };
+
+  /* =======================================================
+     SUCCESS
+  ======================================================= */
 
   if (submitted) {
     return (
       <main className="min-h-[calc(100vh-72px)] bg-[#f7f7f7] px-4 py-8 sm:px-6 lg:px-8">
         <div className="mx-auto flex min-h-[calc(100vh-140px)] max-w-xl items-center justify-center">
           <motion.div
-            initial={{ opacity: 0, y: 15, scale: 0.97 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
+            initial={{
+              opacity: 0,
+              y: 15,
+              scale: 0.97,
+            }}
+            animate={{
+              opacity: 1,
+              y: 0,
+              scale: 1,
+            }}
             className="w-full rounded-2xl border border-gray-200 bg-white p-7 text-center shadow-sm sm:p-9"
           >
             <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-green-50">
@@ -115,7 +275,12 @@ export default function BugReportPage() {
 
             <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-gray-500">
               Thanks for helping us improve VendorStore. We've received your bug
-              report and will review it.
+              report and our team will review it.
+            </p>
+
+            <p className="mx-auto mt-2 max-w-md text-xs leading-5 text-gray-400">
+              If an administrator replies to your report, the response will be
+              available from your account.
             </p>
 
             <div className="mt-7 flex flex-col gap-3 sm:flex-row">
@@ -128,7 +293,10 @@ export default function BugReportPage() {
 
               <button
                 type="button"
-                onClick={() => setSubmitted(false)}
+                onClick={() => {
+                  setSubmitted(false);
+                  setError("");
+                }}
                 className="flex h-11 flex-1 items-center justify-center rounded-lg border border-gray-200 px-4 text-sm font-bold text-gray-700 transition hover:border-[#f85606] hover:text-[#f85606]"
               >
                 Report another bug
@@ -140,12 +308,16 @@ export default function BugReportPage() {
     );
   }
 
+  /* =======================================================
+     FORM PAGE
+  ======================================================= */
+
   return (
     <main className="min-h-[calc(100vh-72px)] bg-[#f7f7f7] px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
       <div className="mx-auto max-w-3xl">
-        {/* =====================================================
+        {/* =================================================
             TOP
-        ====================================================== */}
+        ================================================== */}
 
         <div className="mb-6 flex items-center justify-between">
           <Link
@@ -161,13 +333,19 @@ export default function BugReportPage() {
           </span>
         </div>
 
-        {/* =====================================================
+        {/* =================================================
             HEADER
-        ====================================================== */}
+        ================================================== */}
 
         <motion.section
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
+          initial={{
+            opacity: 0,
+            y: 10,
+          }}
+          animate={{
+            opacity: 1,
+            y: 0,
+          }}
           className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm sm:p-8"
         >
           <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
@@ -188,23 +366,39 @@ export default function BugReportPage() {
           </div>
         </motion.section>
 
-        {/* =====================================================
+        {/* =================================================
             FORM
-        ====================================================== */}
+        ================================================== */}
 
         <motion.form
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.06 }}
+          initial={{
+            opacity: 0,
+            y: 10,
+          }}
+          animate={{
+            opacity: 1,
+            y: 0,
+          }}
+          transition={{
+            delay: 0.06,
+          }}
           onSubmit={handleSubmit}
           className="mt-5 rounded-2xl border border-gray-200 bg-white p-6 shadow-sm sm:p-8"
         >
-          {/* Error */}
+          {/* =================================================
+              ERROR
+          ================================================== */}
 
           {error && (
             <motion.div
-              initial={{ opacity: 0, y: -5 }}
-              animate={{ opacity: 1, y: 0 }}
+              initial={{
+                opacity: 0,
+                y: -5,
+              }}
+              animate={{
+                opacity: 1,
+                y: 0,
+              }}
               className="mb-6 flex items-start gap-3 rounded-xl border border-red-100 bg-red-50 p-4"
             >
               <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-red-500" />
@@ -216,7 +410,9 @@ export default function BugReportPage() {
           )}
 
           <div className="space-y-5">
-            {/* Title */}
+            {/* =================================================
+                TITLE
+            ================================================== */}
 
             <div>
               <label
@@ -243,7 +439,9 @@ export default function BugReportPage() {
               </p>
             </div>
 
-            {/* Category */}
+            {/* =================================================
+                CATEGORY
+            ================================================== */}
 
             <div>
               <label
@@ -257,25 +455,29 @@ export default function BugReportPage() {
                 id="bug-category"
                 value={form.category}
                 onChange={(event) =>
-                  updateField("category", event.target.value)
+                  updateField("category", event.target.value as BugCategory)
                 }
                 disabled={submitting}
-                className="h-11 w-full rounded-lg border border-gray-200 bg-gray-50 px-3.5 text-sm text-gray-900 outline-none transition focus:border-[#f85606] focus:bg-white focus:ring-2 focus:ring-orange-100 disabled:cursor-not-allowed disabled:opacity-60"
+                className="h-11 w-full cursor-pointer rounded-lg border border-gray-200 bg-gray-50 px-3.5 text-sm font-medium text-gray-900 outline-none transition focus:border-[#f85606] focus:bg-white focus:ring-2 focus:ring-orange-100 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                <option value="Other">Other</option>
-                <option value="Products">Products</option>
-                <option value="Cart">Cart</option>
-                <option value="Checkout">Checkout</option>
-                <option value="Orders">Orders</option>
-                <option value="Wishlist">Wishlist</option>
-                <option value="Account">Account</option>
-                <option value="Login">Login / Authentication</option>
-                <option value="UI">UI / Design</option>
-                <option value="Performance">Performance</option>
+                {categoryOptions.map((category) => (
+                  <option key={category.value} value={category.value}>
+                    {category.label}
+                  </option>
+                ))}
               </select>
+
+              <p className="mt-1.5 text-xs leading-5 text-gray-400">
+                {
+                  categoryOptions.find((item) => item.value === form.category)
+                    ?.description
+                }
+              </p>
             </div>
 
-            {/* Description */}
+            {/* =================================================
+                DESCRIPTION
+            ================================================== */}
 
             <div>
               <label
@@ -294,19 +496,21 @@ export default function BugReportPage() {
                 }
                 placeholder="Tell us what happened, what you expected to happen, and how we can reproduce the problem..."
                 rows={7}
-                maxLength={3000}
+                maxLength={5000}
                 disabled={submitting}
                 className="w-full resize-none rounded-lg border border-gray-200 bg-gray-50 px-3.5 py-3 text-sm leading-6 text-gray-900 outline-none transition placeholder:text-gray-400 focus:border-[#f85606] focus:bg-white focus:ring-2 focus:ring-orange-100 disabled:cursor-not-allowed disabled:opacity-60"
               />
 
               <div className="mt-1.5 flex justify-end">
                 <span className="text-xs text-gray-400">
-                  {form.description.length}/3000
+                  {form.description.length}/5000
                 </span>
               </div>
             </div>
 
-            {/* Email */}
+            {/* =================================================
+                EMAIL
+            ================================================== */}
 
             <div>
               <label
@@ -359,14 +563,22 @@ export default function BugReportPage() {
           </div>
         </motion.form>
 
-        {/* =====================================================
+        {/* =================================================
             TIPS
-        ====================================================== */}
+        ================================================== */}
 
         <motion.section
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.12 }}
+          initial={{
+            opacity: 0,
+            y: 10,
+          }}
+          animate={{
+            opacity: 1,
+            y: 0,
+          }}
+          transition={{
+            delay: 0.12,
+          }}
           className="mt-5 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6"
         >
           <h2 className="text-sm font-black text-gray-900">

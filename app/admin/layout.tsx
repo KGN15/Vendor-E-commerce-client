@@ -17,6 +17,7 @@ import {
   Menu,
   X,
   ChevronRight,
+  Bug,
 } from "lucide-react";
 import { useStore } from "@/lib/store";
 
@@ -60,6 +61,11 @@ const navItems = [
     label: "Analytics",
     href: "/admin/analytics",
     icon: BarChart3,
+  },
+  {
+    label: "Bug Report",
+    href: "/admin/bug-reports",
+    icon: Bug,
   },
 ];
 
