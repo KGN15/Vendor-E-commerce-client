@@ -25,7 +25,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useStore } from "@/lib/store";
 
 export function Navbar() {
-  const { cart, openCart, user, setUser, wishlist, clearUser } = useStore();
+  const { cart, openCart, user, clearUser, wishlist } = useStore();
 
   const router = useRouter();
 
@@ -37,7 +37,9 @@ export function Navbar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const mobileSearchRef = useRef<HTMLInputElement>(null);
+
   const wishlistCount = wishlist?.length || 0;
+
   /* =========================================================
      AUTH + HYDRATION
   ========================================================= */
@@ -51,17 +53,14 @@ export function Navbar() {
       setHasToken(Boolean(token));
     };
 
-    // Initial auth check
     checkAuth();
 
-    // Cross-tab auth changes
     const handleStorage = (event: StorageEvent) => {
       if (event.key === "vendorstore_token") {
         setHasToken(Boolean(event.newValue));
       }
     };
 
-    // Same-tab auth changes
     const handleAuthChange = () => {
       checkAuth();
     };
@@ -128,6 +127,31 @@ export function Navbar() {
 
   const firstName = user?.name?.trim()?.split(/\s+/)[0] || "Account";
 
+  const avatar = user?.avatar || "";
+
+  /* =========================================================
+     NAV ITEMS
+  ========================================================= */
+
+  const navItems = [
+    {
+      label: "Home",
+      href: "/",
+    },
+    {
+      label: "Products",
+      href: "/products",
+    },
+    {
+      label: "About",
+      href: "/about",
+    },
+    {
+      label: "Contact",
+      href: "/contact",
+    },
+  ];
+
   /* =========================================================
      SEARCH
   ========================================================= */
@@ -180,6 +204,60 @@ export function Navbar() {
   const closeMenus = () => {
     setAccountOpen(false);
     setMobileMenuOpen(false);
+  };
+
+  /* =========================================================
+     PROFILE AVATAR
+  ========================================================= */
+
+  const ProfileAvatar = ({
+    size = "normal",
+  }: {
+    size?: "small" | "normal" | "large";
+  }) => {
+    if (avatar) {
+      if (size === "small") {
+        return (
+          <img
+            src={avatar}
+            alt={user?.name || "Profile"}
+            className="h-8 w-8 rounded-full object-cover"
+          />
+        );
+      }
+
+      if (size === "large") {
+        return (
+          <img
+            src={avatar}
+            alt={user?.name || "Profile"}
+            className="h-11 w-11 rounded-full object-cover"
+          />
+        );
+      }
+
+      return (
+        <img
+          src={avatar}
+          alt={user?.name || "Profile"}
+          className="h-8 w-8 rounded-full object-cover"
+        />
+      );
+    }
+
+    if (size === "large") {
+      return (
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white text-[#f85606] shadow-sm">
+          <User className="h-5 w-5" />
+        </div>
+      );
+    }
+
+    return (
+      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-orange-50 text-[#f85606]">
+        <User className="h-[17px] w-[17px]" />
+      </div>
+    );
   };
 
   /* =========================================================
@@ -282,19 +360,15 @@ export function Navbar() {
             ================================================== */}
 
             <nav className="ml-5 hidden items-center gap-6 lg:flex">
-              <Link
-                href="/"
-                className="text-sm font-semibold text-gray-800 transition-colors hover:text-[#f85606]"
-              >
-                Home
-              </Link>
-
-              <Link
-                href="/products"
-                className="text-sm font-medium text-gray-600 transition-colors hover:text-[#f85606]"
-              >
-                Products
-              </Link>
+              {navItems.map((item) => (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className="text-sm font-medium text-gray-600 transition-colors hover:text-[#f85606]"
+                >
+                  {item.label}
+                </Link>
+              ))}
             </nav>
 
             {/* =================================================
@@ -323,9 +397,7 @@ export function Navbar() {
             ================================================== */}
 
             <div className="ml-auto flex shrink-0 items-center gap-1 md:ml-4">
-              {/* ---------------------------------------------
-                  MOBILE ACCOUNT ICON
-              ---------------------------------------------- */}
+              {/* MOBILE ACCOUNT */}
 
               {mounted && isLoggedIn && (
                 <Link
@@ -333,13 +405,19 @@ export function Navbar() {
                   className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-gray-700 transition hover:bg-gray-100 md:hidden"
                   aria-label="My account"
                 >
-                  <User className="h-5 w-5" />
+                  {avatar ? (
+                    <img
+                      src={avatar}
+                      alt={user?.name || "Profile"}
+                      className="h-8 w-8 rounded-full object-cover"
+                    />
+                  ) : (
+                    <User className="h-5 w-5" />
+                  )}
                 </Link>
               )}
 
-              {/* ---------------------------------------------
-                  MOBILE GET STARTED
-              ---------------------------------------------- */}
+              {/* MOBILE GET STARTED */}
 
               {mounted && !isLoggedIn && (
                 <Link
@@ -351,9 +429,9 @@ export function Navbar() {
                 </Link>
               )}
 
-              {/* ---------------------------------------------
+              {/* =================================================
                   DESKTOP WISHLIST
-              ---------------------------------------------- */}
+              ================================================== */}
 
               <Link
                 href="/wishlist"
@@ -386,34 +464,16 @@ export function Navbar() {
                       stiffness: 500,
                       damping: 22,
                     }}
-                    className="
-        absolute
-        -right-0.5
-        -top-0.5
-        flex
-        h-[18px]
-        min-w-[18px]
-        items-center
-        justify-center
-        rounded-full
-        bg-[#f85606]
-        px-1
-        text-[9px]
-        font-extrabold
-        leading-none
-        text-white
-        ring-2
-        ring-white
-      "
+                    className="absolute -right-0.5 -top-0.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[#f85606] px-1 text-[9px] font-extrabold leading-none text-white ring-2 ring-white"
                   >
                     {wishlistCount > 99 ? "99+" : wishlistCount}
                   </motion.span>
                 )}
               </Link>
 
-              {/* ---------------------------------------------
+              {/* =================================================
                   DESKTOP AUTH
-              ---------------------------------------------- */}
+              ================================================== */}
 
               {!mounted ? (
                 <div className="hidden h-10 w-[120px] md:block" />
@@ -436,9 +496,7 @@ export function Navbar() {
                   </Link>
                 </div>
               ) : (
-                /* ---------------------------------------------
-                   DESKTOP ACCOUNT
-                ---------------------------------------------- */
+                /* DESKTOP ACCOUNT */
 
                 <div className="relative hidden md:block">
                   <button
@@ -448,9 +506,7 @@ export function Navbar() {
                     aria-expanded={accountOpen}
                     aria-label="Open account menu"
                   >
-                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-orange-50 text-[#f85606]">
-                      <User className="h-[17px] w-[17px]" />
-                    </div>
+                    <ProfileAvatar />
 
                     <div className="max-w-[90px] text-left">
                       <p className="text-[10px] leading-none text-gray-400">
@@ -503,11 +559,21 @@ export function Navbar() {
                           }}
                           className="absolute right-0 top-[calc(100%+10px)] z-50 w-64 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl"
                         >
+                          {/* ACCOUNT HEADER */}
+
                           <div className="border-b border-gray-100 px-4 py-4">
                             <div className="flex items-center gap-3">
-                              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-orange-50 text-[#f85606]">
-                                <UserCircle className="h-6 w-6" />
-                              </div>
+                              {avatar ? (
+                                <img
+                                  src={avatar}
+                                  alt={user?.name || "Profile"}
+                                  className="h-10 w-10 shrink-0 rounded-full object-cover"
+                                />
+                              ) : (
+                                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-orange-50 text-[#f85606]">
+                                  <UserCircle className="h-6 w-6" />
+                                </div>
+                              )}
 
                               <div className="min-w-0">
                                 <p className="truncate text-sm font-bold text-gray-900">
@@ -522,6 +588,8 @@ export function Navbar() {
                               </div>
                             </div>
                           </div>
+
+                          {/* ACCOUNT MENU */}
 
                           <div className="p-2">
                             <Link
@@ -542,6 +610,8 @@ export function Navbar() {
                               My Orders
                             </Link>
 
+                            {/* WISHLIST */}
+
                             <Link
                               href="/wishlist"
                               onClick={closeMenus}
@@ -553,7 +623,7 @@ export function Navbar() {
                                     className={`h-[18px] w-[18px] ${
                                       wishlistCount > 0
                                         ? "fill-red-500 text-red-500"
-                                        : ""
+                                        : "text-gray-700"
                                     }`}
                                   />
 
@@ -648,7 +718,7 @@ export function Navbar() {
       <AnimatePresence>
         {mobileMenuOpen && (
           <>
-            {/* Overlay */}
+            {/* OVERLAY */}
 
             <motion.button
               type="button"
@@ -660,7 +730,7 @@ export function Navbar() {
               exit={{ opacity: 0 }}
             />
 
-            {/* Drawer */}
+            {/* DRAWER */}
 
             <motion.aside
               initial={{ x: "-100%" }}
@@ -673,7 +743,7 @@ export function Navbar() {
               }}
               className="fixed left-0 top-0 z-[70] flex h-[100dvh] w-[min(86%,360px)] flex-col overflow-hidden bg-white shadow-2xl md:hidden"
             >
-              {/* Drawer Header */}
+              {/* DRAWER HEADER */}
 
               <div className="flex h-[68px] shrink-0 items-center justify-between border-b border-gray-100 px-4">
                 <Link
@@ -701,12 +771,10 @@ export function Navbar() {
                 </button>
               </div>
 
-              {/* Drawer Content */}
+              {/* DRAWER CONTENT */}
 
               <div className="flex-1 overflow-y-auto overscroll-contain px-4 py-5">
-                {/* =================================================
-                    ACCOUNT / GET STARTED
-                ================================================== */}
+                {/* ACCOUNT / GET STARTED */}
 
                 {isLoggedIn ? (
                   <motion.div
@@ -721,9 +789,15 @@ export function Navbar() {
                     className="mb-5 rounded-xl border border-orange-100 bg-orange-50/60 p-4"
                   >
                     <div className="flex items-center gap-3">
-                      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white text-[#f85606] shadow-sm">
-                        <User className="h-5 w-5" />
-                      </div>
+                      {avatar ? (
+                        <img
+                          src={avatar}
+                          alt={user?.name || "Profile"}
+                          className="h-11 w-11 shrink-0 rounded-full object-cover shadow-sm"
+                        />
+                      ) : (
+                        <ProfileAvatar size="large" />
+                      )}
 
                       <div className="min-w-0">
                         <p className="text-[10px] font-bold uppercase tracking-wider text-[#f85606]">
@@ -774,9 +848,7 @@ export function Navbar() {
                   </div>
                 )}
 
-                {/* =================================================
-                    NAVIGATION
-                ================================================== */}
+                {/* NAVIGATION */}
 
                 <p className="mb-2 px-2 text-[10px] font-bold uppercase tracking-wider text-gray-400">
                   Navigation
@@ -822,6 +894,8 @@ export function Navbar() {
                     <ArrowRight className="h-4 w-4 opacity-40" />
                   </button>
 
+                  {/* MOBILE WISHLIST */}
+
                   <Link
                     href="/wishlist"
                     onClick={closeMenus}
@@ -838,27 +912,7 @@ export function Navbar() {
                         />
 
                         {wishlistCount > 0 && (
-                          <span
-                            className="
-            absolute
-            -right-2.5
-            -top-2
-            flex
-            h-4
-            min-w-4
-            items-center
-            justify-center
-            rounded-full
-            bg-[#f85606]
-            px-1
-            text-[8px]
-            font-extrabold
-            leading-none
-            text-white
-            ring-2
-            ring-white
-          "
-                          >
+                          <span className="absolute -right-2.5 -top-2 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#f85606] px-1 text-[8px] font-extrabold leading-none text-white ring-2 ring-white">
                             {wishlistCount > 99 ? "99+" : wishlistCount}
                           </span>
                         )}
@@ -876,9 +930,7 @@ export function Navbar() {
                   </Link>
                 </div>
 
-                {/* =================================================
-                    ACCOUNT
-                ================================================== */}
+                {/* ACCOUNT */}
 
                 {isLoggedIn && (
                   <>
@@ -918,9 +970,7 @@ export function Navbar() {
                   </>
                 )}
 
-                {/* =================================================
-                    CART
-                ================================================== */}
+                {/* CART */}
 
                 <div className="my-5 border-t border-gray-100" />
 
@@ -946,9 +996,7 @@ export function Navbar() {
                   )}
                 </button>
 
-                {/* =================================================
-                    LOGOUT
-                ================================================== */}
+                {/* LOGOUT */}
 
                 {isLoggedIn && (
                   <button
@@ -962,9 +1010,7 @@ export function Navbar() {
                 )}
               </div>
 
-              {/* =================================================
-                  DRAWER FOOTER
-              ================================================== */}
+              {/* DRAWER FOOTER */}
 
               <div className="shrink-0 border-t border-gray-100 px-4 py-4">
                 <p className="text-center text-[10px] font-medium text-gray-400">

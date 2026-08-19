@@ -1,14 +1,8 @@
-// lib/store.ts
 "use client";
 
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import {
-  ICartItem,
-  IProduct,
-  IProductVariant,
-  IUser,
-} from "@/types";
+import { ICartItem, IProduct, IProductVariant, IUser } from "@/types";
 import { api } from "@/lib/axios";
 
 interface StoreState {
@@ -17,9 +11,12 @@ interface StoreState {
   ========================================================= */
 
   user: IUser | null;
+  authLoading: boolean;
+  authInitialized: boolean;
 
   setUser: (user: IUser | null) => void;
   clearUser: () => void;
+  fetchCurrentUser: () => Promise<void>;
 
   /* =========================================================
      CART STATE
@@ -33,17 +30,11 @@ interface StoreState {
   closeCart: () => void;
   toggleCart: () => void;
 
-  addToCart: (
-    product: IProduct,
-    variant?: IProductVariant,
-  ) => void;
+  addToCart: (product: IProduct, variant?: IProductVariant) => void;
 
   removeFromCart: (variantId: string) => void;
 
-  updateQuantity: (
-    variantId: string,
-    quantity: number,
-  ) => void;
+  updateQuantity: (variantId: string, quantity: number) => void;
 
   clearCart: () => void;
 
@@ -83,18 +74,118 @@ export const useStore = create<StoreState>()(
 
       user: null,
 
+      authLoading: false,
+
+      authInitialized: false,
+
+      /* -----------------------------------------------------
+         SET USER
+      ----------------------------------------------------- */
+
       setUser: (user) => {
         set({
           user,
         });
       },
 
+      /* -----------------------------------------------------
+         CLEAR USER
+      ----------------------------------------------------- */
+
       clearUser: () => {
         set({
           user: null,
+          authInitialized: true,
+          authLoading: false,
+
           wishlist: [],
           wishlistLoaded: false,
         });
+      },
+
+      /* -----------------------------------------------------
+         FETCH CURRENT USER
+      ----------------------------------------------------- */
+
+      fetchCurrentUser: async () => {
+        if (typeof window === "undefined") {
+          return;
+        }
+
+        const token = localStorage.getItem("vendorstore_token");
+
+        /* ---------------------------------------------------
+           NO TOKEN
+        --------------------------------------------------- */
+
+        if (!token) {
+          set({
+            user: null,
+            authLoading: false,
+            authInitialized: true,
+          });
+
+          return;
+        }
+
+        try {
+          set({
+            authLoading: true,
+          });
+
+          const response = await api.get("/auth/me");
+
+          /*
+           * Backend response:
+           *
+           * {
+           *   success: true,
+           *   data: user
+           * }
+           *
+           * তাই response.data.data হচ্ছে user.
+           */
+
+          const userData =
+            response.data?.data?.user ??
+            response.data?.data ??
+            response.data?.user;
+
+          if (!userData) {
+            throw new Error("User data was not returned from /auth/me");
+          }
+
+          set({
+            user: userData,
+            authInitialized: true,
+          });
+        } catch (error: any) {
+          console.error("Failed to fetch current user:", error);
+
+          const status = error?.response?.status;
+
+          /*
+           * Token invalid / expired
+           */
+
+          if (status === 401) {
+            localStorage.removeItem("vendorstore_token");
+
+            set({
+              user: null,
+              wishlist: [],
+              wishlistLoaded: false,
+            });
+          }
+
+          set({
+            authInitialized: true,
+          });
+        } finally {
+          set({
+            authLoading: false,
+          });
+        }
       },
 
       /* =====================================================
@@ -128,19 +219,17 @@ export const useStore = create<StoreState>()(
       ===================================================== */
 
       addToCart: (product, variant) => {
-        const selectedVariant: IProductVariant =
-          variant ||
+        const selectedVariant: IProductVariant = variant ||
           product.variants?.[0] || {
             _id: product._id,
             sku: product.slug || "default-sku",
             price: product.basePrice,
             stock: 10,
             design: "",
-    isActive: true,
+            isActive: true,
           };
 
-        const variantId =
-          selectedVariant._id || product._id;
+        const variantId = selectedVariant._id || product._id;
 
         const currentCart = get().cart;
 
@@ -157,8 +246,7 @@ export const useStore = create<StoreState>()(
 
           updatedCart[existingIndex] = {
             ...updatedCart[existingIndex],
-            quantity:
-              updatedCart[existingIndex].quantity + 1,
+            quantity: updatedCart[existingIndex].quantity + 1,
           };
 
           set({
@@ -193,9 +281,7 @@ export const useStore = create<StoreState>()(
 
       removeFromCart: (variantId) => {
         set((state) => ({
-          cart: state.cart.filter(
-            (item) => item.variantId !== variantId,
-          ),
+          cart: state.cart.filter((item) => item.variantId !== variantId),
         }));
       },
 
@@ -236,17 +322,11 @@ export const useStore = create<StoreState>()(
       ===================================================== */
 
       getCartSubtotal: () => {
-        return get().cart.reduce(
-          (total, item) => {
-            const price =
-              item.variant?.price ??
-              item.product?.basePrice ??
-              0;
+        return get().cart.reduce((total, item) => {
+          const price = item.variant?.price ?? item.product?.basePrice ?? 0;
 
-            return total + price * item.quantity;
-          },
-          0,
-        );
+          return total + price * item.quantity;
+        }, 0);
       },
 
       /* =====================================================
@@ -268,13 +348,7 @@ export const useStore = create<StoreState>()(
           return;
         }
 
-        const token = localStorage.getItem(
-          "vendorstore_token",
-        );
-
-        /* ---------------------------------------------------
-           NOT LOGGED IN
-        --------------------------------------------------- */
+        const token = localStorage.getItem("vendorstore_token");
 
         if (!token) {
           set({
@@ -293,20 +367,14 @@ export const useStore = create<StoreState>()(
 
           const response = await api.get("/wishlist");
 
-          const products =
-            response.data?.data?.products;
+          const products = response.data?.data?.products;
 
           set({
-            wishlist: Array.isArray(products)
-              ? products
-              : [],
+            wishlist: Array.isArray(products) ? products : [],
             wishlistLoaded: true,
           });
         } catch (error) {
-          console.error(
-            "Failed to fetch wishlist:",
-            error,
-          );
+          console.error("Failed to fetch wishlist:", error);
 
           set({
             wishlist: [],
@@ -328,13 +396,7 @@ export const useStore = create<StoreState>()(
           throw new Error("AUTH_REQUIRED");
         }
 
-        const token = localStorage.getItem(
-          "vendorstore_token",
-        );
-
-        /* ---------------------------------------------------
-           AUTH CHECK
-        --------------------------------------------------- */
+        const token = localStorage.getItem("vendorstore_token");
 
         if (!token) {
           throw new Error("AUTH_REQUIRED");
@@ -345,45 +407,22 @@ export const useStore = create<StoreState>()(
             wishlistLoading: true,
           });
 
-          const response = await api.post(
-            "/wishlist/toggle",
-            {
-              productId,
-            },
-          );
+          const response = await api.post("/wishlist/toggle", {
+            productId,
+          });
 
-          const action =
-            response.data?.data?.action;
+          const action = response.data?.data?.action;
 
-          if (
-            action !== "added" &&
-            action !== "removed"
-          ) {
-            throw new Error(
-              "Invalid wishlist response.",
-            );
+          if (action !== "added" && action !== "removed") {
+            throw new Error("Invalid wishlist response.");
           }
 
-          /* =================================================
-             ADDED
-          ================================================= */
-
           if (action === "added") {
-            /*
-             * ProductCard থেকে product পাঠানো হলে
-             * সাথে সাথে UI update হবে।
-             *
-             * Wishlist page থেকে শুধু productId পাঠালেও
-             * fetchWishlist() দিয়ে server state sync করা যাবে।
-             */
-
             if (product) {
               set((state) => {
-                const alreadyExists =
-                  state.wishlist.some(
-                    (item) =>
-                      item._id === productId,
-                  );
+                const alreadyExists = state.wishlist.some(
+                  (item) => item._id === productId,
+                );
 
                 if (alreadyExists) {
                   return {
@@ -392,42 +431,25 @@ export const useStore = create<StoreState>()(
                 }
 
                 return {
-                  wishlist: [
-                    ...state.wishlist,
-                    product,
-                  ],
+                  wishlist: [...state.wishlist, product],
                   wishlistLoaded: true,
                 };
               });
             } else {
-              /*
-               * Product object না থাকলে server থেকে
-               * wishlist আবার load করি।
-               */
               await get().fetchWishlist();
             }
           }
 
-          /* =================================================
-             REMOVED
-          ================================================= */
-
           if (action === "removed") {
             set((state) => ({
-              wishlist: state.wishlist.filter(
-                (item) =>
-                  item._id !== productId,
-              ),
+              wishlist: state.wishlist.filter((item) => item._id !== productId),
               wishlistLoaded: true,
             }));
           }
 
           return action;
         } catch (error) {
-          console.error(
-            "Wishlist toggle failed:",
-            error,
-          );
+          console.error("Wishlist toggle failed:", error);
 
           throw error;
         } finally {
@@ -443,9 +465,7 @@ export const useStore = create<StoreState>()(
 
       isWishlisted: (productId) => {
         return get().wishlist.some(
-          (product) =>
-            product?._id?.toString() ===
-            productId?.toString(),
+          (product) => product?._id?.toString() === productId?.toString(),
         );
       },
 
@@ -463,14 +483,6 @@ export const useStore = create<StoreState>()(
 
     /* =======================================================
        PERSIST
-
-       ONLY CART IS STORED IN LOCAL STORAGE.
-
-       user      ❌
-       wishlist  ❌
-       token     ❌ through Zustand
-
-       cart      ✅
     ======================================================= */
 
     {

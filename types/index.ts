@@ -1,10 +1,14 @@
 // types/index.ts
 
 export interface IUser {
-  _id: string;
+  id: string;
   name: string;
   email: string;
-  role?: string;
+  role: string;
+  authProvider: string;
+  avatar?: string | null;
+  createdAt: string | Date;
+  updatedAt: string | Date;
 }
 
 export interface IProductVariant {

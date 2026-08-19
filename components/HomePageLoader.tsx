@@ -10,8 +10,9 @@ export function HomePageLoader() {
   useEffect(() => {
     let startTime: number | null = null;
     let frame: number;
+    let timeout: ReturnType<typeof setTimeout>;
 
-    const duration = 2200;
+    const duration = 700;
 
     const animate = (time: number) => {
       if (!startTime) startTime = time;
@@ -19,7 +20,6 @@ export function HomePageLoader() {
       const elapsed = time - startTime;
       const percentage = Math.min(elapsed / duration, 1);
 
-      // Smooth ease-out
       const eased = 1 - Math.pow(1 - percentage, 3);
 
       setProgress(Math.floor(eased * 100));
@@ -29,15 +29,18 @@ export function HomePageLoader() {
       } else {
         setProgress(100);
 
-        setTimeout(() => {
+        timeout = setTimeout(() => {
           setVisible(false);
-        }, 450);
+        }, 150);
       }
     };
 
     frame = requestAnimationFrame(animate);
 
-    return () => cancelAnimationFrame(frame);
+    return () => {
+      cancelAnimationFrame(frame);
+      clearTimeout(timeout);
+    };
   }, []);
 
   return (
@@ -49,20 +52,18 @@ export function HomePageLoader() {
             y: "-100%",
             transition: {
               duration: 0.9,
-              ease: [0.76, 0, 0.24, 1],
+              ease: [0.65, 0, 0.35, 1],
             },
           }}
           className="fixed inset-0 z-[99999] flex items-center justify-center overflow-hidden bg-white"
         >
-          {/* Subtle orange glow */}
           <div className="pointer-events-none absolute left-1/2 top-1/2 h-[500px] w-[500px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-orange-100/40 blur-[110px]" />
 
           <div className="relative w-[300px] sm:w-[360px]">
-            {/* Brand */}
             <motion.div
               initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5 }}
+              transition={{ duration: 0.3 }}
               className="mb-8 text-center"
             >
               <p className="text-[11px] font-black uppercase tracking-[0.35em] text-gray-400">
@@ -71,7 +72,6 @@ export function HomePageLoader() {
               </p>
             </motion.div>
 
-            {/* Number */}
             <div className="text-center">
               <motion.span className="inline-block text-[78px] font-black leading-none tracking-[-0.07em] text-gray-950 sm:text-[96px]">
                 {progress}
@@ -79,14 +79,13 @@ export function HomePageLoader() {
               </motion.span>
             </div>
 
-            {/* Progress */}
             <div className="mt-10">
               <div className="relative h-[2px] w-full overflow-hidden bg-gray-100">
                 <motion.div
                   className="absolute left-0 top-0 h-full bg-[#f85606]"
                   animate={{ width: `${progress}%` }}
                   transition={{
-                    duration: 0.08,
+                    duration: 0.04,
                     ease: "linear",
                   }}
                 />
@@ -104,7 +103,6 @@ export function HomePageLoader() {
             </div>
           </div>
 
-          {/* Bottom */}
           <div className="absolute bottom-8 left-0 right-0 text-center">
             <p className="text-[9px] font-bold uppercase tracking-[0.3em] text-gray-300">
               Quality products · Better prices
